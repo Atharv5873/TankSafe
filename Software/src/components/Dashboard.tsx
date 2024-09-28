@@ -238,7 +238,7 @@ const Dashboard: React.FC = () => {
   return (
     <div className="dashboard-container flex flex-col gap-6">
       <div className="grid grid-cols-2 gap-4">
-        <div className="status-card p-4 border rounded-lg shadow-md">
+        <div className="status-card p-4 border bg-slate-200 rounded-lg shadow-md">
           <h3 className="text-lg font-bold mb-4">Vehicle Status</h3>
           <p>Ignition: {data.car_status.ignition ? 'On' : 'Off'}</p>
           <p>Speed: {data.car_status.speed} km/h</p>
@@ -251,7 +251,7 @@ const Dashboard: React.FC = () => {
           </button>
         </div>
 
-        <div className="sensor-card p-4 border rounded-lg shadow-md">
+        <div className="sensor-card p-4 border rounded-lg bg-slate-200 shadow-md">
           <h3 className="text-lg font-bold mb-4">Sensor Data</h3>
           <p>Fuel Level: {data.sensor.fuel_level} %</p>
           <p>Humidity: {data.sensor.humidity} %</p>
@@ -259,7 +259,7 @@ const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      <div className="alert-section p-4 border rounded-lg shadow-md">
+      <div className="alert-section p-4 border rounded-lg bg-slate-200 shadow-md">
         <h3 className="text-lg font-bold mb-4">Alerts</h3>
         {data.alerts.fuel_theft === 'No alerts' && <p>No alerts.</p>}
         {data.alerts.fuel_theft !== 'No alerts' && (
@@ -267,7 +267,7 @@ const Dashboard: React.FC = () => {
             <p>Fuel Alert: {data.alerts.fuel_theft}</p>
             <p>Fuel Level Difference: {data.alerts.fuel_level_difference} L</p>
             <button
-              className="bg-red-500 text-white px-4 py-2 rounded-lg mt-4"
+              className="bg-green-500 text-white px-4 py-2 rounded-lg mt-4 mr-4"
               onClick={handleResolveIssue}
             >
               Resolve Issue
@@ -285,7 +285,7 @@ const Dashboard: React.FC = () => {
         )}
       </div>
 
-      <div className="recent-logs-section p-4 border rounded-lg shadow-md">
+      <div className="recent-logs-section p-4 border rounded-lg bg-slate-200 shadow-md">
         <h3 className="text-lg font-bold mb-4">Recent Logs</h3>
         <div className="grid grid-cols-2 gap-4">
           <div>
