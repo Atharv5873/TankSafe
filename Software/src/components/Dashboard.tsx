@@ -57,7 +57,7 @@ const Dashboard: React.FC = () => {
     const dataRef = ref(database, '/');
     const logsRef = ref(database, 'logs');
 
-    // Set up Firebase listeners
+    // Firebase listeners
     const unsubscribeData = onValue(dataRef, (snapshot) => {
       const data = snapshot.val();
       setData(data);
