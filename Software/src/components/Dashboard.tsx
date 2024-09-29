@@ -46,12 +46,9 @@ const Dashboard: React.FC = () => {
   const [fuelTheftLogs, setFuelTheftLogs] = useState<Log[]>([]);
   const [refuelingLogs, setRefuelingLogs] = useState<Log[]>([]);
   const [isMonitoring, setIsMonitoring] = useState(false);
-  const [alertDisplayed, setAlertDisplayed] = useState<boolean>(false); // Track whether an alert is currently shown
   const navigate = useNavigate();
 
-  // Debounce timeout for logging
-  const [lastLogTime, setLastLogTime] = useState<number | null>(null);
-  const logCooldown = 30000; // 30 seconds cooldown
+  // Removed logCooldown and lastLogTime since logs are now only generated on resolving alerts
 
   useEffect(() => {
     const dataRef = ref(database, '/');
@@ -65,19 +62,6 @@ const Dashboard: React.FC = () => {
       // Fetch location whenever car status updates
       if (data && data.car_status.latitude && data.car_status.longitude) {
         fetchLocation(data.car_status.latitude.replace(/°.*$/, ''), data.car_status.longitude.replace(/°.*$/, ''));
-      }
-
-      // Log theft or refueling events based on alerts, but only if monitoring is enabled and no alert is currently shown
-      if (data && data.alerts && !alertDisplayed) {
-        if (!data.alerts.is_resolved && !data.alerts.is_monitored) {
-          if (data.alerts.fuel_theft.includes("Refueling")) {
-            handleLogEvent('Refueling');
-            setAlertDisplayed(true); // Only show one alert until monitoring is restarted
-          } else if (data.alerts.fuel_theft.includes("Theft")) {
-            handleLogEvent('Theft');
-            setAlertDisplayed(true); // Only show one alert until monitoring is restarted
-          }
-        }
       }
     });
 
@@ -98,12 +82,12 @@ const Dashboard: React.FC = () => {
         });
       }
 
-      // Sort the logs in descending order by timestamp and take the latest 5
+      // Sort the logs in descending order by timestamp and take the latest 3
       theftLogs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
       refuelLogs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
-      setFuelTheftLogs(theftLogs.slice(0, 5));
-      setRefuelingLogs(refuelLogs.slice(0, 5));
+      setFuelTheftLogs(theftLogs.slice(0, 3));
+      setRefuelingLogs(refuelLogs.slice(0, 3));
     });
 
     // Cleanup listeners on unmount
@@ -111,7 +95,7 @@ const Dashboard: React.FC = () => {
       unsubscribeData();
       unsubscribeLogs();
     };
-  }, [alertDisplayed]);
+  }, []);
 
   const fetchLocation = async (latitude: string, longitude: string, retries = 3) => {
     const cleanLatitude = parseFloat(latitude.replace(/[^\d.-]/g, ''));
@@ -139,14 +123,6 @@ const Dashboard: React.FC = () => {
   };
 
   const handleLogEvent = (eventType: string) => {
-    const currentTime = Date.now();
-    
-    // Check if enough time has passed since the last log
-    if (lastLogTime && currentTime - lastLogTime < logCooldown) {
-      console.log(`Skipping log for ${eventType} due to cooldown.`);
-      return; // Exit if within cooldown
-    }
-
     const logsRef = ref(database, 'logs');
     const logData: Log = {
       timestamp: new Date().toISOString(),
@@ -159,7 +135,6 @@ const Dashboard: React.FC = () => {
     push(logsRef, logData)
       .then(() => {
         console.log(`Logged ${eventType} event to Firebase`);
-        setLastLogTime(currentTime); // Update last log time
       })
       .catch((error) => {
         console.error(`Error logging ${eventType} event:`, error);
@@ -173,7 +148,6 @@ const Dashboard: React.FC = () => {
         .then(() => {
           console.log("Monitoring started");
           setIsMonitoring(true);
-          setAlertDisplayed(false); // Allow new alerts to appear after monitoring starts
         })
         .catch((error: any) => {
           console.error("Error starting monitoring:", error);
@@ -189,14 +163,28 @@ const Dashboard: React.FC = () => {
   const handleResolveIssue = () => {
     if (data) {
       const alertsRef = ref(database, '/alerts');
-      update(alertsRef, { is_resolved: true, fuel_theft: 'No alerts' })
-        .then(() => {
-          console.log("Issue resolved in Firebase");
-          handleLogEvent('Alert Resolved');
-        })
-        .catch((error: any) => {
-          console.error("Error updating issue status:", error);
-        });
+      const currentFuelTheft = data.alerts.fuel_theft;
+
+      // Determine the eventType based on the current alert
+      let eventType = '';
+      if (currentFuelTheft.includes("Refueling")) {
+        eventType = 'Refueling';
+      } else if (currentFuelTheft.includes("Theft")) {
+        eventType = 'Theft';
+      }
+
+      if (eventType) {
+        update(alertsRef, { is_resolved: true, fuel_theft: 'No alerts', is_monitored: false })
+          .then(() => {
+            console.log("Issue resolved in Firebase");
+            handleLogEvent(eventType);
+          })
+          .catch((error: any) => {
+            console.error("Error updating issue status:", error);
+          });
+      } else {
+        console.warn("Unknown fuel_theft type:", currentFuelTheft);
+      }
     }
   };
 
@@ -207,9 +195,11 @@ const Dashboard: React.FC = () => {
       update(carStatusRef, { stopped: newStatus, ignition: !newStatus })
         .then(() => {
           console.log(newStatus ? 'Vehicle stopped' : 'Vehicle started');
-          if (!newStatus) {
-            // Only log if the vehicle is stopped
-            handleLogEvent(newStatus ? 'Vehicle Stopped' : 'Vehicle Started');
+          if (newStatus) {
+            // Log only when the vehicle is stopped
+            handleLogEvent('Vehicle Stopped');
+          } else {
+            handleLogEvent('Vehicle Started');
           }
         })
         .catch((error: any) => {
